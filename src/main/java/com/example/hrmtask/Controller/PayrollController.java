@@ -2,15 +2,26 @@ package com.example.hrmtask.Controller;
 
 import java.util.List;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import com.example.hrmtask.DTO.BulkPayrollRequestDto;
 import com.example.hrmtask.DTO.BulkPayrollResponseDto;
+import com.example.hrmtask.DTO.PayrollExportRequest;
 import com.example.hrmtask.DTO.PayrollRequestDto;
 import com.example.hrmtask.DTO.PayrollScheduleDto;
 import com.example.hrmtask.Model.Payroll;
 import com.example.hrmtask.Model.PayrollSchedule;
+import com.example.hrmtask.Service.PayrollExportService;
 import com.example.hrmtask.Service.PayrollService;
 
 @RestController
@@ -18,9 +29,11 @@ import com.example.hrmtask.Service.PayrollService;
 public class PayrollController {
 
     private final PayrollService payrollService;
+    private final PayrollExportService payrollExportService;
 
-    public PayrollController(PayrollService payrollService) {
+    public PayrollController(PayrollService payrollService, PayrollExportService payrollExportService) {
         this.payrollService = payrollService;
+        this.payrollExportService = payrollExportService;
     }
 
     @PostMapping("/process")
@@ -81,5 +94,27 @@ public class PayrollController {
     public ResponseEntity<PayrollSchedule> cancelPayrollSchedule(@PathVariable Long id) {
         PayrollSchedule cancelled = payrollService.cancelPayrollSchedule(id);
         return ResponseEntity.ok(cancelled);
+    }
+
+    @PostMapping("/payslips/download")
+    public ResponseEntity<byte[]> downloadPayslipsAsZip(@RequestBody PayrollExportRequest request) {
+        byte[] zipBytes = payrollExportService.downloadPayslipsAsZip(request);
+        String filename = payrollExportService.getZipFilename(request);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.parseMediaType("application/zip"))
+                .body(zipBytes);
+    }
+
+    @PostMapping("/report")
+    public ResponseEntity<byte[]> generatePayrollExcel(@RequestBody PayrollExportRequest request) {
+        byte[] excelBytes = payrollExportService.generatePayrollExcel(request);
+        String filename = payrollExportService.getExcelFilename(request);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(excelBytes);
     }
 }
