@@ -1,0 +1,277 @@
+package com.example.hrmtask.Service;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.example.hrmtask.DTO.BulkPayrollResponseDto;
+import com.example.hrmtask.DTO.PayrollScheduleDto;
+import com.example.hrmtask.Model.Employees;
+import com.example.hrmtask.Model.Payroll;
+import com.example.hrmtask.Model.PayrollSchedule;
+import com.example.hrmtask.Model.SalaryStructure;
+import com.example.hrmtask.Repository.EmployeesRepository;
+import com.example.hrmtask.Repository.PayrollRepository;
+import com.example.hrmtask.Repository.PayrollScheduleRepository;
+import com.example.hrmtask.Repository.SalaryStructureRepository;
+
+@Service
+public class PayrollService {
+
+    private final PayrollRepository payrollRepository;
+    private final SalaryStructureRepository salaryStructureRepository;
+    private final EmployeesRepository employeesRepository;
+    private final PayrollScheduleRepository payrollScheduleRepository;
+    private final PdfService pdfService;
+    private final EmailService emailService;
+
+    public PayrollService(PayrollRepository payrollRepository,
+                          SalaryStructureRepository salaryStructureRepository,
+                          EmployeesRepository employeesRepository,
+                          PayrollScheduleRepository payrollScheduleRepository,
+                          PdfService pdfService,
+                          EmailService emailService) {
+        this.payrollRepository = payrollRepository;
+        this.salaryStructureRepository = salaryStructureRepository;
+        this.employeesRepository = employeesRepository;
+        this.payrollScheduleRepository = payrollScheduleRepository;
+        this.pdfService = pdfService;
+        this.emailService = emailService;
+    }
+
+    public Payroll processEmployeePayroll(Long employeeId, Integer payMonth, Integer payYear) {
+        if (payrollRepository.existsByEmployeeIdAndPayMonthAndPayYear(employeeId, payMonth, payYear)) {
+            throw new RuntimeException("Payroll already processed for employee " + employeeId + " for " + payMonth + "/" + payYear);
+        }
+
+        Employees employee = employeesRepository.findById(employeeId)
+                .orElseThrow(() -> new RuntimeException("Employee not found with id: " + employeeId));
+
+        SalaryStructure structure = salaryStructureRepository.findTopByEmployeeIdOrderByEffectiveFromDesc(employeeId)
+                .orElseThrow(() -> new RuntimeException("Salary structure not found for employee id: " + employeeId));
+
+        BigDecimal basicSalary = structure.getBasicSalary() != null ? structure.getBasicSalary() : BigDecimal.ZERO;
+        BigDecimal hra = structure.getHra() != null ? structure.getHra() : BigDecimal.ZERO;
+        BigDecimal allowance = structure.getAllowance() != null ? structure.getAllowance() : BigDecimal.ZERO;
+        BigDecimal grossSalary = basicSalary.add(hra).add(allowance);
+
+        BigDecimal pf = structure.getPf() != null ? structure.getPf() : BigDecimal.ZERO;
+        BigDecimal otherDeduction = structure.getOtherDeduction() != null ? structure.getOtherDeduction() : BigDecimal.ZERO;
+        BigDecimal totalDeduction = pf.add(otherDeduction);
+
+        BigDecimal netSalary = grossSalary.subtract(totalDeduction);
+
+        Payroll payroll = new Payroll();
+        payroll.setEmployeeId(employeeId);
+        payroll.setPayMonth(payMonth);
+        payroll.setPayYear(payYear);
+        payroll.setBasicSalary(basicSalary);
+        payroll.setHra(hra);
+        payroll.setAllowance(allowance);
+        payroll.setGrossSalary(grossSalary);
+        payroll.setPf(pf);
+        payroll.setOtherDeduction(otherDeduction);
+        payroll.setTotalDeduction(totalDeduction);
+        payroll.setNetSalary(netSalary);
+        payroll.setProcessedAt(LocalDateTime.now());
+        payroll.setEmailStatus("PENDING");
+
+        Payroll savedPayroll = payrollRepository.save(payroll);
+
+        String filePath = null;
+        try {
+            filePath = pdfService.generatePayslip(savedPayroll, employee);
+            savedPayroll.setPayslipPath(filePath);
+            payrollRepository.save(savedPayroll);
+        } catch (Exception e) {
+            System.err.println("Failed to generate PDF payslip for employee " + employeeId + ": " + e.getMessage());
+        }
+
+        if (filePath != null && employee.getEmail() != null && !employee.getEmail().isBlank()) {
+            String empName = ((employee.getFirstName() != null ? employee.getFirstName() : "") + " " + (employee.getLastName() != null ? employee.getLastName() : "")).trim();
+            boolean success = emailService.sendPayslipWithRetry(employee.getEmail(), filePath, empName, payMonth, payYear, netSalary, 3, 1000);
+            if (success) {
+                savedPayroll.setEmailStatus("SENT");
+            } else {
+                savedPayroll.setEmailStatus("FAILED");
+            }
+            savedPayroll = payrollRepository.save(savedPayroll);
+        } else {
+            savedPayroll.setEmailStatus("FAILED");
+            savedPayroll = payrollRepository.save(savedPayroll);
+        }
+
+        return savedPayroll;
+    }
+
+    public BulkPayrollResponseDto processAllEmployeesPayroll(Integer payMonth, Integer payYear) {
+        List<Employees> activeEmployees = employeesRepository.findByStatusIgnoreCase("ACTIVE");
+
+        int total = activeEmployees.size();
+        int successful = 0;
+        int failed = 0;
+        int alreadyProcessed = 0;
+
+        for (Employees emp : activeEmployees) {
+            if (payrollRepository.existsByEmployeeIdAndPayMonthAndPayYear(emp.getId(), payMonth, payYear)) {
+                alreadyProcessed++;
+                continue;
+            }
+
+            try {
+                processEmployeePayroll(emp.getId(), payMonth, payYear);
+                successful++;
+            } catch (Exception e) {
+                System.err.println("Failed to process payroll for employee id " + emp.getId() + ": " + e.getMessage());
+                failed++;
+            }
+        }
+
+        return new BulkPayrollResponseDto(total, successful, failed, alreadyProcessed);
+    }
+
+    public List<Payroll> getEmployeePayrollHistory(Long employeeId) {
+        return payrollRepository.findByEmployeeIdOrderByPayYearDescPayMonthDesc(employeeId);
+    }
+
+    public Payroll getPayrollById(Long id) {
+        return payrollRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Payroll record not found with id: " + id));
+    }
+
+    public List<Payroll> getAllPayrolls() {
+        return payrollRepository.findAll();
+    }
+
+    public Payroll retryEmailForPayroll(Long payrollId) {
+        Payroll payroll = payrollRepository.findById(payrollId)
+                .orElseThrow(() -> new RuntimeException("Payroll record not found with id: " + payrollId));
+
+        Employees employee = employeesRepository.findById(payroll.getEmployeeId())
+                .orElseThrow(() -> new RuntimeException("Employee not found with id: " + payroll.getEmployeeId()));
+
+        if (employee.getEmail() == null || employee.getEmail().isBlank()) {
+            payroll.setEmailStatus("FAILED");
+            return payrollRepository.save(payroll);
+        }
+
+        String filePath = payroll.getPayslipPath();
+        if (filePath == null || !(new java.io.File(filePath).exists())) {
+            try {
+                filePath = pdfService.generatePayslip(payroll, employee);
+                payroll.setPayslipPath(filePath);
+            } catch (Exception e) {
+                System.err.println("Failed to generate PDF payslip during email retry for payroll " + payrollId + ": " + e.getMessage());
+                payroll.setEmailStatus("FAILED");
+                return payrollRepository.save(payroll);
+            }
+        }
+
+        String empName = ((employee.getFirstName() != null ? employee.getFirstName() : "") + " " + (employee.getLastName() != null ? employee.getLastName() : "")).trim();
+        boolean success = emailService.sendPayslipWithRetry(employee.getEmail(), filePath, empName, payroll.getPayMonth(), payroll.getPayYear(), payroll.getNetSalary(), 3, 1000);
+
+        if (success) {
+            payroll.setEmailStatus("SENT");
+        } else {
+            payroll.setEmailStatus("FAILED");
+        }
+
+        return payrollRepository.save(payroll);
+    }
+
+    public List<Payroll> retryAllFailedEmails() {
+        List<Payroll> failedPayrolls = payrollRepository.findByEmailStatusIgnoreCase("FAILED");
+        List<Payroll> pendingPayrolls = payrollRepository.findByEmailStatusIgnoreCase("PENDING");
+        failedPayrolls.addAll(pendingPayrolls);
+
+        for (Payroll p : failedPayrolls) {
+            try {
+                retryEmailForPayroll(p.getId());
+            } catch (Exception e) {
+                System.err.println("Error retrying email for payroll id " + p.getId() + ": " + e.getMessage());
+            }
+        }
+
+        return payrollRepository.findAll();
+    }
+
+    // Schedule Management
+
+    public PayrollSchedule createPayrollSchedule(PayrollScheduleDto dto) {
+        List<Employees> activeEmployees = employeesRepository.findByStatusIgnoreCase("ACTIVE");
+        if (!activeEmployees.isEmpty()) {
+            boolean allProcessed = activeEmployees.stream().allMatch(emp -> 
+                payrollRepository.existsByEmployeeIdAndPayMonthAndPayYear(emp.getId(), dto.getPayMonth(), dto.getPayYear())
+            );
+            if (allProcessed) {
+                throw new RuntimeException("Payroll for " + dto.getPayMonth() + "/" + dto.getPayYear() + " has already been completely processed");
+            }
+        }
+
+        PayrollSchedule schedule = new PayrollSchedule();
+        schedule.setPayMonth(dto.getPayMonth());
+        schedule.setPayYear(dto.getPayYear());
+        schedule.setScheduledAt(dto.getScheduledAt());
+        schedule.setEnabled(true);
+        schedule.setStatus("PENDING");
+        schedule.setCreatedAt(LocalDateTime.now());
+
+        return payrollScheduleRepository.save(schedule);
+    }
+
+    public List<PayrollSchedule> getPayrollSchedules() {
+        return payrollScheduleRepository.findAll();
+    }
+
+    public PayrollSchedule updatePayrollSchedule(Long id, PayrollScheduleDto dto) {
+        PayrollSchedule schedule = payrollScheduleRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Payroll schedule not found with id: " + id));
+
+        if ("COMPLETED".equalsIgnoreCase(schedule.getStatus())) {
+            throw new RuntimeException("Cannot update a completed payroll schedule");
+        }
+
+        schedule.setPayMonth(dto.getPayMonth());
+        schedule.setPayYear(dto.getPayYear());
+        schedule.setScheduledAt(dto.getScheduledAt());
+
+        return payrollScheduleRepository.save(schedule);
+    }
+
+    public PayrollSchedule cancelPayrollSchedule(Long id) {
+        PayrollSchedule schedule = payrollScheduleRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Payroll schedule not found with id: " + id));
+
+        schedule.setEnabled(false);
+        schedule.setStatus("CANCELLED");
+
+        return payrollScheduleRepository.save(schedule);
+    }
+
+    @Scheduled(fixedDelay = 30000)
+    @Transactional
+    public void executeScheduledPayrolls() {
+        List<PayrollSchedule> pendingSchedules = payrollScheduleRepository
+                .findByEnabledTrueAndScheduledAtLessThanEqualAndStatus(LocalDateTime.now(), "PENDING");
+
+        for (PayrollSchedule schedule : pendingSchedules) {
+            schedule.setStatus("IN_PROGRESS");
+            payrollScheduleRepository.save(schedule);
+
+            try {
+                processAllEmployeesPayroll(schedule.getPayMonth(), schedule.getPayYear());
+                schedule.setStatus("COMPLETED");
+                schedule.setEnabled(false);
+                schedule.setExecutedAt(LocalDateTime.now());
+            } catch (Exception e) {
+                System.err.println("Error executing scheduled payroll id " + schedule.getId() + ": " + e.getMessage());
+                schedule.setStatus("FAILED");
+            }
+            payrollScheduleRepository.save(schedule);
+        }
+    }
+}

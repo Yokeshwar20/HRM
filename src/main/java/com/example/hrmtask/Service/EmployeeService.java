@@ -1,0 +1,101 @@
+package com.example.hrmtask.Service;
+
+import java.time.LocalDate;
+
+import org.springframework.stereotype.Service;
+
+import com.example.hrmtask.DTO.EmployeeCreationDTO;
+import com.example.hrmtask.Model.Employees;
+import com.example.hrmtask.Model.Users;
+import com.example.hrmtask.Repository.EmployeesRepository;
+import com.example.hrmtask.Repository.UsersRepository;
+
+@Service
+public class EmployeeService {
+    private final EmployeesRepository employeesRepository;
+    private final UsersRepository usersRepository;
+    public EmployeeService(EmployeesRepository employeesRepository,UsersRepository usersRepository){
+        this.employeesRepository=employeesRepository;
+        this.usersRepository=usersRepository;
+    }
+
+    public Employees createEmployee(EmployeeCreationDTO data){
+        if(employeesRepository.existsByEmail(data.getEmail())){
+            throw new RuntimeException("Employee email already exist");
+        }
+        if(data.getEmployeeCode() != null && employeesRepository.existsByEmployeeCode(data.getEmployeeCode())){
+            throw new RuntimeException("Employee code already exists");
+        }
+        Employees employee=new Employees();
+        employee.setEmployeeCode(data.getEmployeeCode());
+        employee.setEmail(data.getEmail());
+        employee.setFirstName(data.getFirstName());
+        employee.setLastName(data.getLastName());
+        employee.setPhone(data.getPhone());
+        employee.setDesignation(data.getDesignation());
+        employee.setDepartment(data.getDepartment());
+        employee.setJoiningDate(data.getJoiningDate());
+        employee.setStatus("active");
+        employeesRepository.save(employee);
+        return employee;
+    }
+
+    public Employees editEmployee(Long id,Employees data){
+        Employees employee = employeesRepository.findById(id).orElseThrow(() -> new RuntimeException("Employee not found"));
+
+        if (data.getEmail() != null && !data.getEmail().equalsIgnoreCase(employee.getEmail()) && employeesRepository.existsByEmail(data.getEmail())) {
+            throw new RuntimeException("Employee email already exist");
+        }
+
+        employee.setFirstName(data.getFirstName());
+        employee.setLastName(data.getLastName());
+        employee.setEmail(data.getEmail());
+        employee.setPhone(data.getPhone());
+        employee.setDepartment(data.getDepartment());
+        employee.setDesignation(data.getDesignation());
+        employee.setJoiningDate(data.getJoiningDate());
+        employee.setEndingDate(data.getEndingDate());
+        employee.setStatus(data.getStatus());
+
+        if (employee.getUserId() != null && data.getEmail() != null) {
+            usersRepository.findById(employee.getUserId()).ifPresent(user -> {
+                user.setEmail(data.getEmail());
+                usersRepository.save(user);
+            });
+        }
+
+        return employeesRepository.save(employee);
+    }
+
+    public Employees updateEmployeeStatus(Long id, String status, LocalDate endingDate) {
+        Employees employee = employeesRepository.findById(id).orElseThrow(() -> new RuntimeException("Employee not found"));
+        employee.setStatus(status);
+        if (status.equalsIgnoreCase("RESIGNED") || status.equalsIgnoreCase("TERMINATED") ||status.equalsIgnoreCase("INACTIVE")) {
+            employee.setEndingDate(endingDate);
+            if (employee.getUserId() != null) {
+                    Users user = usersRepository.findById(employee.getUserId())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+                    user.setEnabled(false);
+                    usersRepository.save(user);
+            }
+        }
+        if (status.equalsIgnoreCase("ACTIVE")) {
+            employee.setEndingDate(null);
+            if (employee.getUserId() != null) {
+                    Users user = usersRepository.findById(employee.getUserId())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+                    user.setEnabled(true);
+                    usersRepository.save(user);
+            }
+        }
+        return employeesRepository.save(employee);
+    }
+
+    public void deleteEmployee(Long id) {
+        Employees employee = employeesRepository.findById(id).orElseThrow(() -> new RuntimeException("Employee not found"));
+        if (employee.getUserId() != null) {
+            usersRepository.deleteById(employee.getUserId());
+        }
+        employeesRepository.delete(employee);
+    }
+}
