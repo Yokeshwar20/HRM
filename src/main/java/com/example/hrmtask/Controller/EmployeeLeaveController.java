@@ -41,4 +41,16 @@ public class EmployeeLeaveController {
         List<LeaveRequest> requests = leaveService.getEmployeeLeaveRequests();
         return ResponseEntity.ok(requests);
     }
+
+    @GetMapping("/types")
+    public ResponseEntity<List<String>> getAllLeaveTypes() {
+        List<String> types = leaveService.getAllLeaveTypes();
+        return ResponseEntity.ok(types);
+    }
+
+    @GetMapping("/policies")
+    public ResponseEntity<List<com.example.hrmtask.Model.LeavePolicy>> getAllLeavePolicies() {
+        List<com.example.hrmtask.Model.LeavePolicy> policies = leaveService.getAllPolicies();
+        return ResponseEntity.ok(policies);
+    }
 }

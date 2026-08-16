@@ -7,6 +7,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.example.hrmtask.DTO.SalaryStructureDto;
+import com.example.hrmtask.Model.Employees;
 import com.example.hrmtask.Model.SalaryStructure;
 import com.example.hrmtask.Repository.EmployeesRepository;
 import com.example.hrmtask.Repository.SalaryStructureRepository;
@@ -23,8 +24,8 @@ public class SalaryStructureService {
     }
 
     public SalaryStructure createSalaryStructure(SalaryStructureDto dto) {
-        employeesRepository.findById(dto.getEmployeeId())
-                .orElseThrow(() -> new RuntimeException("Employee not found"));
+        Employees employee = employeesRepository.findByEmployeeCode(dto.getEmployeeCode())
+                .orElseThrow(() -> new RuntimeException("Employee not found with code: " + dto.getEmployeeCode()));
 
         BigDecimal basicSalary = dto.getBasicSalary() != null ? dto.getBasicSalary() : BigDecimal.ZERO;
         BigDecimal hra = dto.getHra() != null ? dto.getHra() : BigDecimal.ZERO;
@@ -33,7 +34,7 @@ public class SalaryStructureService {
         BigDecimal grossSalary = dto.getGrossSalary() != null ? dto.getGrossSalary() : calculatedGross;
 
         SalaryStructure structure = new SalaryStructure();
-        structure.setEmployeeId(dto.getEmployeeId());
+        structure.setEmployeeId(employee.getId());
         structure.setBasicSalary(basicSalary);
         structure.setHra(hra);
         structure.setAllowance(allowance);
@@ -50,11 +51,22 @@ public class SalaryStructureService {
                 .orElseThrow(() -> new RuntimeException("Salary structure not found for employee id: " + employeeId));
     }
 
+    public SalaryStructure getEmployeeSalaryStructureByCode(String employeeCode) {
+        Employees employee = employeesRepository.findByEmployeeCode(employeeCode)
+                .orElseThrow(() -> new RuntimeException("Employee not found with code: " + employeeCode));
+        return getEmployeeSalaryStructure(employee.getId());
+    }
+
     public SalaryStructure updateSalaryStructure(Long id, SalaryStructureDto dto) {
         SalaryStructure existing = salaryStructureRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Salary structure not found with id: " + id));
 
-        Long empId = dto.getEmployeeId() != null ? dto.getEmployeeId() : existing.getEmployeeId();
+        Long empId = existing.getEmployeeId();
+        if (dto.getEmployeeCode() != null && !dto.getEmployeeCode().isBlank()) {
+            Employees employee = employeesRepository.findByEmployeeCode(dto.getEmployeeCode())
+                    .orElseThrow(() -> new RuntimeException("Employee not found with code: " + dto.getEmployeeCode()));
+            empId = employee.getId();
+        }
 
         BigDecimal basicSalary = dto.getBasicSalary() != null ? dto.getBasicSalary() : (existing.getBasicSalary() != null ? existing.getBasicSalary() : BigDecimal.ZERO);
         BigDecimal hra = dto.getHra() != null ? dto.getHra() : (existing.getHra() != null ? existing.getHra() : BigDecimal.ZERO);
@@ -77,5 +89,11 @@ public class SalaryStructureService {
 
     public List<SalaryStructure> getSalaryStructureHistory(Long employeeId) {
         return salaryStructureRepository.findByEmployeeIdOrderByEffectiveFromDesc(employeeId);
+    }
+
+    public List<SalaryStructure> getSalaryStructureHistoryByCode(String employeeCode) {
+        Employees employee = employeesRepository.findByEmployeeCode(employeeCode)
+                .orElseThrow(() -> new RuntimeException("Employee not found with code: " + employeeCode));
+        return getSalaryStructureHistory(employee.getId());
     }
 }

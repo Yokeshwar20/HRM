@@ -64,6 +64,13 @@ public class LeaveService {
         return leavePolicyRepository.findAll();
     }
 
+    public List<String> getAllLeaveTypes() {
+        return leavePolicyRepository.findAll().stream()
+                .map(LeavePolicy::getLeaveType)
+                .distinct()
+                .toList();
+    }
+
     public void deletePolicy(Long id) {
         LeavePolicy policy = leavePolicyRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Leave policy not found"));
@@ -287,11 +294,68 @@ public class LeaveService {
         return savedRequest;
     }
 
+    public com.example.hrmtask.DTO.LeaveRequestResponseDto mapToLeaveRequestResponseDto(LeaveRequest request) {
+        com.example.hrmtask.DTO.LeaveRequestResponseDto dto = new com.example.hrmtask.DTO.LeaveRequestResponseDto();
+        dto.setId(request.getId());
+        dto.setEmployeeId(request.getEmployeeId());
+        dto.setLeaveHistoryId(request.getLeaveHistoryId());
+        dto.setLeaveType(request.getLeaveType());
+        dto.setStartDate(request.getStartDate());
+        dto.setEndDate(request.getEndDate());
+        dto.setReason(request.getReason());
+        dto.setStatus(request.getStatus());
+        dto.setHrComment(request.getHrComment());
+        dto.setAppliedAt(request.getAppliedAt());
+        dto.setDecidedAt(request.getDecidedAt());
+
+        if (request.getEmployeeId() != null) {
+            employeesRepository.findById(request.getEmployeeId()).ifPresent(emp -> {
+                dto.setEmployeeCode(emp.getEmployeeCode());
+                String fullName = ((emp.getFirstName() != null ? emp.getFirstName() : "") + " " +
+                                  (emp.getLastName() != null ? emp.getLastName() : "")).trim();
+                dto.setEmployeeName(fullName);
+            });
+        }
+        return dto;
+    }
+
+    public List<com.example.hrmtask.DTO.LeaveRequestResponseDto> getPendingLeaveRequestsForHR() {
+        return leaveRequestRepository.findByStatus("PENDING").stream()
+                .map(this::mapToLeaveRequestResponseDto)
+                .toList();
+    }
+
+    public List<com.example.hrmtask.DTO.LeaveRequestResponseDto> getAllLeaveRequestsForHR() {
+        return leaveRequestRepository.findAll().stream()
+                .map(this::mapToLeaveRequestResponseDto)
+                .toList();
+    }
+
     public List<LeaveRequest> getPendingLeaveRequests() {
         return leaveRequestRepository.findByStatus("PENDING");
     }
 
     public List<LeaveHistory> getEmployeeLeaveHistoryForHR(Long employeeId) {
         return leaveHistoryRepository.findByEmployeeId(employeeId);
+    }
+
+    public List<LeaveHistory> getEmployeeLeaveHistoryForHRByCode(String employeeCode) {
+        Employees employee = employeesRepository.findByEmployeeCode(employeeCode)
+                .orElseThrow(() -> new RuntimeException("Employee not found with code: " + employeeCode));
+        return leaveHistoryRepository.findByEmployeeId(employee.getId());
+    }
+
+    public List<LeaveRequest> getEmployeeLeaveRequestsByCode(String employeeCode) {
+        Employees employee = employeesRepository.findByEmployeeCode(employeeCode)
+                .orElseThrow(() -> new RuntimeException("Employee not found with code: " + employeeCode));
+        return leaveRequestRepository.findByEmployeeId(employee.getId());
+    }
+
+    public List<com.example.hrmtask.DTO.LeaveRequestResponseDto> getEmployeeLeaveRequestsForHRByCode(String employeeCode) {
+        Employees employee = employeesRepository.findByEmployeeCode(employeeCode)
+                .orElseThrow(() -> new RuntimeException("Employee not found with code: " + employeeCode));
+        return leaveRequestRepository.findByEmployeeId(employee.getId()).stream()
+                .map(this::mapToLeaveRequestResponseDto)
+                .toList();
     }
 }

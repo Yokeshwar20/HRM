@@ -161,6 +161,12 @@ public class PayrollService {
         return new BulkPayrollResponseDto(total, successful, failed, alreadyProcessed);
     }
 
+    public Payroll processEmployeePayrollByCode(String employeeCode, Integer payMonth, Integer payYear) {
+        Employees employee = employeesRepository.findByEmployeeCode(employeeCode)
+                .orElseThrow(() -> new RuntimeException("Employee not found with code: " + employeeCode));
+        return processEmployeePayroll(employee.getId(), payMonth, payYear);
+    }
+
     public List<Payroll> getMyPayrollHistory() {
         Employees employee = authenticatedUserService.getAuthenticatedEmployee();
         return payrollRepository.findByEmployeeIdOrderByPayYearDescPayMonthDesc(employee.getId());
@@ -168,6 +174,12 @@ public class PayrollService {
 
     public List<Payroll> getEmployeePayrollHistory(Long employeeId) {
         return payrollRepository.findByEmployeeIdOrderByPayYearDescPayMonthDesc(employeeId);
+    }
+
+    public List<Payroll> getEmployeePayrollHistoryByCode(String employeeCode) {
+        Employees employee = employeesRepository.findByEmployeeCode(employeeCode)
+                .orElseThrow(() -> new RuntimeException("Employee not found with code: " + employeeCode));
+        return payrollRepository.findByEmployeeIdOrderByPayYearDescPayMonthDesc(employee.getId());
     }
 
     public Payroll getPayrollById(Long id) {

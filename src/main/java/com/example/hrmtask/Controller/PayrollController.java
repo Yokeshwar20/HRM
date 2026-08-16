@@ -44,13 +44,19 @@ public class PayrollController {
 
     @PostMapping("/process/employee")
     public ResponseEntity<Payroll> processEmployeePayroll(@RequestBody PayrollRequestDto dto) {
-        Payroll payroll = payrollService.processEmployeePayroll(dto.getEmployeeId(), dto.getPayMonth(), dto.getPayYear());
+        Payroll payroll = payrollService.processEmployeePayrollByCode(dto.getEmployeeCode(), dto.getPayMonth(), dto.getPayYear());
         return ResponseEntity.ok(payroll);
     }
 
     @GetMapping
     public ResponseEntity<List<Payroll>> getAllPayrolls() {
         List<Payroll> payrolls = payrollService.getAllPayrolls();
+        return ResponseEntity.ok(payrolls);
+    }
+
+    @GetMapping("/employee/{employeeCode}/history")
+    public ResponseEntity<List<Payroll>> getEmployeePayrollHistory(@PathVariable String employeeCode) {
+        List<Payroll> payrolls = payrollService.getEmployeePayrollHistoryByCode(employeeCode);
         return ResponseEntity.ok(payrolls);
     }
 
@@ -96,7 +102,7 @@ public class PayrollController {
         return ResponseEntity.ok(cancelled);
     }
 
-    @PostMapping("/payslips/download")
+    @PostMapping(value = "/payslips/download", consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.ALL_VALUE})
     public ResponseEntity<byte[]> downloadPayslipsAsZip(@RequestBody PayrollExportRequest request) {
         byte[] zipBytes = payrollExportService.downloadPayslipsAsZip(request);
         String filename = payrollExportService.getZipFilename(request);
@@ -107,7 +113,7 @@ public class PayrollController {
                 .body(zipBytes);
     }
 
-    @PostMapping("/report")
+    @PostMapping(value = "/report", consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.ALL_VALUE})
     public ResponseEntity<byte[]> generatePayrollExcel(@RequestBody PayrollExportRequest request) {
         byte[] excelBytes = payrollExportService.generatePayrollExcel(request);
         String filename = payrollExportService.getExcelFilename(request);

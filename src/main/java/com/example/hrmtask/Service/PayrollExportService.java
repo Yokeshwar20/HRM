@@ -63,10 +63,10 @@ public class PayrollExportService {
             throw new RuntimeException("Invalid date range: start period cannot be after end period");
         }
 
-        if (request.getEmployeeIds() != null && !request.getEmployeeIds().isEmpty()) {
-            for (Long empId : request.getEmployeeIds()) {
-                if (empId == null || !employeesRepository.existsById(empId)) {
-                    throw new RuntimeException("Employee with id " + empId + " not found");
+        if (request.getEmployeeCodes() != null && !request.getEmployeeCodes().isEmpty()) {
+            for (String code : request.getEmployeeCodes()) {
+                if (code == null || !employeesRepository.existsByEmployeeCode(code)) {
+                    throw new RuntimeException("Employee with code " + code + " not found");
                 }
             }
         }
@@ -76,7 +76,7 @@ public class PayrollExportService {
         validateRequest(request);
 
         List<Payroll> payrolls;
-        if (request.getEmployeeIds() == null || request.getEmployeeIds().isEmpty()) {
+        if (request.getEmployeeCodes() == null || request.getEmployeeCodes().isEmpty()) {
             payrolls = payrollRepository.findPayrollsForDateRange(
                     request.getStartYear(),
                     request.getStartMonth(),
@@ -84,12 +84,18 @@ public class PayrollExportService {
                     request.getEndMonth()
             );
         } else {
+            List<Long> employeeIds = request.getEmployeeCodes().stream()
+                    .map(code -> employeesRepository.findByEmployeeCode(code)
+                            .orElseThrow(() -> new RuntimeException("Employee not found with code: " + code))
+                            .getId())
+                    .toList();
+
             payrolls = payrollRepository.findPayrollsForDateRangeAndEmployees(
                     request.getStartYear(),
                     request.getStartMonth(),
                     request.getEndYear(),
                     request.getEndMonth(),
-                    request.getEmployeeIds()
+                    employeeIds
             );
         }
 

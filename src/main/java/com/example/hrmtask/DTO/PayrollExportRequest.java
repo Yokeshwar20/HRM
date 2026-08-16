@@ -12,5 +12,5 @@ public class PayrollExportRequest {
     private Integer startYear;
     private Integer endMonth;
     private Integer endYear;
-    private List<Long> employeeIds;
+    private List<String> employeeCodes;
 }

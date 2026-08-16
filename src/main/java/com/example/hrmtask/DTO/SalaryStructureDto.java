@@ -9,7 +9,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SalaryStructureDto {
-    private Long employeeId;
+    private String employeeCode;
     private BigDecimal basicSalary;
     private BigDecimal hra;
     private BigDecimal allowance;

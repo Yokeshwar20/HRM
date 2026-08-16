@@ -7,7 +7,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PayrollRequestDto {
-    private Long employeeId;
+    private String employeeCode;
     private Integer payMonth;
     private Integer payYear;
 }

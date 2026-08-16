@@ -3,7 +3,13 @@ package com.example.hrmtask.Controller;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import com.example.hrmtask.DTO.SalaryStructureDto;
 import com.example.hrmtask.Model.SalaryStructure;
@@ -25,9 +31,9 @@ public class SalaryStructureController {
         return ResponseEntity.ok(created);
     }
 
-    @GetMapping("/employee/{employeeId}")
-    public ResponseEntity<SalaryStructure> getEmployeeSalaryStructure(@PathVariable Long employeeId) {
-        SalaryStructure structure = salaryStructureService.getEmployeeSalaryStructure(employeeId);
+    @GetMapping("/employee/{employeeCode}")
+    public ResponseEntity<SalaryStructure> getEmployeeSalaryStructureByCode(@PathVariable String employeeCode) {
+        SalaryStructure structure = salaryStructureService.getEmployeeSalaryStructureByCode(employeeCode);
         return ResponseEntity.ok(structure);
     }
 
@@ -37,9 +43,9 @@ public class SalaryStructureController {
         return ResponseEntity.ok(updated);
     }
 
-    @GetMapping("/employee/{employeeId}/history")
-    public ResponseEntity<List<SalaryStructure>> getSalaryStructureHistory(@PathVariable Long employeeId) {
-        List<SalaryStructure> history = salaryStructureService.getSalaryStructureHistory(employeeId);
+    @GetMapping("/employee/{employeeCode}/history")
+    public ResponseEntity<List<SalaryStructure>> getSalaryStructureHistoryByCode(@PathVariable String employeeCode) {
+        List<SalaryStructure> history = salaryStructureService.getSalaryStructureHistoryByCode(employeeCode);
         return ResponseEntity.ok(history);
     }
 }
