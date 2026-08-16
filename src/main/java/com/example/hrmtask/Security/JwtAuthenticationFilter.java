@@ -79,11 +79,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             } catch (UsernameNotFoundException ex) {
-                // User no longer exists in DB; do not set authentication into
-                // SecurityContextHolder
             } catch (Exception ex) {
-                // General error loading user or validating token; do not set authentication
-                // into SecurityContextHolder
             }
         }
 

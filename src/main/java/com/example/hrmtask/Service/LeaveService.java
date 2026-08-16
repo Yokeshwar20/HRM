@@ -44,7 +44,6 @@ public class LeaveService {
         this.authenticatedUserService = authenticatedUserService;
     }
 
-    // 1. Leave Policy Operations (HR)
 
     public LeavePolicy createPolicy(LeavePolicy policy) {
         if (leavePolicyRepository.findByLeaveType(policy.getLeaveType()).isPresent()) {
@@ -71,7 +70,6 @@ public class LeaveService {
         leavePolicyRepository.delete(policy);
     }
 
-    // 2. Employee Leave Operations (Self-Service)
 
     public LeaveRequest applyForLeave(LeaveRequestDto dto) {
         Employees employee = authenticatedUserService.getAuthenticatedEmployee();
@@ -104,7 +102,7 @@ public class LeaveService {
 
         LeaveRequest leaveRequest = new LeaveRequest();
         leaveRequest.setEmployeeId(employee.getId());
-        leaveRequest.setLeaveHistoryId(null); // Linked only when HR approves the request
+        leaveRequest.setLeaveHistoryId(null);
         leaveRequest.setLeaveType(dto.getLeaveType());
         leaveRequest.setStartDate(dto.getStartDate());
         leaveRequest.setEndDate(dto.getEndDate());
@@ -135,7 +133,6 @@ public class LeaveService {
         return leaveHistoryRepository.findByEmployeeId(employeeId);
     }
 
-    // 3. HR Decision Operations
 
     @Transactional
     public LeaveRequest approveLeaveRequest(Long id, LeaveDecisionDto dto) {

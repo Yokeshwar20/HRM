@@ -37,7 +37,6 @@ public class AuthenticatedUserService {
     public Employees getAuthenticatedEmployee() {
         Users user = getAuthenticatedUser();
 
-        // 1. Try finding employee by userId relationship (Users.id -> Employees.userId)
         if (user.getId() != null) {
             Employees employee = employeesRepository.findByUserId(user.getId()).orElse(null);
             if (employee != null) {
@@ -45,7 +44,6 @@ public class AuthenticatedUserService {
             }
         }
 
-        // 2. Fallback to finding employee by matching email
         return employeesRepository.findByEmail(user.getEmail())
                 .orElseThrow(() -> new RuntimeException("Employee record not found for authenticated user: " + user.getEmail()));
     }

@@ -233,9 +233,6 @@ public class PayrollService {
 
         return payrollRepository.findAll();
     }
-
-    // Schedule Management
-
     public PayrollSchedule createPayrollSchedule(PayrollScheduleDto dto) {
         List<Employees> activeEmployees = employeesRepository.findByStatusIgnoreCase("ACTIVE");
         if (!activeEmployees.isEmpty()) {
