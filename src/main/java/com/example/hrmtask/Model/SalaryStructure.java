@@ -12,7 +12,7 @@ import java.time.LocalDate;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class SalaryStructure{
+public class SalaryStructure {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -20,6 +20,7 @@ public class SalaryStructure{
     private BigDecimal basicSalary;
     private BigDecimal hra;
     private BigDecimal allowance;
+    private BigDecimal grossSalary;
     private BigDecimal pf;
     private BigDecimal otherDeduction;
     private LocalDate effectiveFrom;

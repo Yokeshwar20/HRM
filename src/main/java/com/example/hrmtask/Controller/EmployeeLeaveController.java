@@ -3,7 +3,11 @@ package com.example.hrmtask.Controller;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import com.example.hrmtask.DTO.LeaveRequestDto;
 import com.example.hrmtask.Model.LeaveHistory;
@@ -26,15 +30,15 @@ public class EmployeeLeaveController {
         return ResponseEntity.ok(leaveRequest);
     }
 
-    @GetMapping("/history/{employeeId}")
-    public ResponseEntity<List<LeaveHistory>> getEmployeeLeaveHistory(@PathVariable Long employeeId) {
-        List<LeaveHistory> history = leaveService.getEmployeeLeaveHistory(employeeId);
+    @GetMapping("/history")
+    public ResponseEntity<List<LeaveHistory>> getEmployeeLeaveHistory() {
+        List<LeaveHistory> history = leaveService.getEmployeeLeaveHistory();
         return ResponseEntity.ok(history);
     }
 
-    @GetMapping("/requests/{employeeId}")
-    public ResponseEntity<List<LeaveRequest>> getEmployeeLeaveRequests(@PathVariable Long employeeId) {
-        List<LeaveRequest> requests = leaveService.getEmployeeLeaveRequests(employeeId);
+    @GetMapping("/requests")
+    public ResponseEntity<List<LeaveRequest>> getEmployeeLeaveRequests() {
+        List<LeaveRequest> requests = leaveService.getEmployeeLeaveRequests();
         return ResponseEntity.ok(requests);
     }
 }

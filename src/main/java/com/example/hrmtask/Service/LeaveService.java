@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,17 +28,20 @@ public class LeaveService {
     private final LeaveRequestRepository leaveRequestRepository;
     private final EmployeesRepository employeesRepository;
     private final EmailService emailService;
+    private final AuthenticatedUserService authenticatedUserService;
 
     public LeaveService(LeavePolicyRepository leavePolicyRepository,
                         LeaveHistoryRepository leaveHistoryRepository,
                         LeaveRequestRepository leaveRequestRepository,
                         EmployeesRepository employeesRepository,
-                        EmailService emailService) {
+                        EmailService emailService,
+                        AuthenticatedUserService authenticatedUserService) {
         this.leavePolicyRepository = leavePolicyRepository;
         this.leaveHistoryRepository = leaveHistoryRepository;
         this.leaveRequestRepository = leaveRequestRepository;
         this.employeesRepository = employeesRepository;
         this.emailService = emailService;
+        this.authenticatedUserService = authenticatedUserService;
     }
 
     // 1. Leave Policy Operations (HR)
@@ -67,18 +71,13 @@ public class LeaveService {
         leavePolicyRepository.delete(policy);
     }
 
-    // 2. Employee Leave Operations
+    // 2. Employee Leave Operations (Self-Service)
 
     public LeaveRequest applyForLeave(LeaveRequestDto dto) {
-        Employees employee = employeesRepository.findById(dto.getEmployeeId())
-                .orElseThrow(() -> new RuntimeException("Employee not found"));
+        Employees employee = authenticatedUserService.getAuthenticatedEmployee();
 
-        leavePolicyRepository.findByLeaveType(dto.getLeaveType())
+        LeavePolicy policy = leavePolicyRepository.findByLeaveType(dto.getLeaveType())
                 .orElseThrow(() -> new RuntimeException("Leave policy not found for type: " + dto.getLeaveType()));
-
-        LeaveHistory leaveHistory = leaveHistoryRepository
-                .findTopByEmployeeIdAndLeaveTypeOrderByEndDateDesc(dto.getEmployeeId(), dto.getLeaveType())
-                .orElseThrow(() -> new RuntimeException("No leave history record found for employee and leave type: " + dto.getLeaveType()));
 
         if (dto.getStartDate().isAfter(dto.getEndDate())) {
             throw new RuntimeException("Start date cannot be after end date");
@@ -87,13 +86,26 @@ public class LeaveService {
         long requestedDaysCount = ChronoUnit.DAYS.between(dto.getStartDate(), dto.getEndDate()) + 1;
         BigDecimal requestedDays = BigDecimal.valueOf(requestedDaysCount);
 
-        if (leaveHistory.getRemainingDays() == null || leaveHistory.getRemainingDays().compareTo(requestedDays) < 0) {
-            throw new RuntimeException("Insufficient leave balance. Remaining: " + leaveHistory.getRemainingDays() + ", Requested: " + requestedDays);
+        Optional<LeaveHistory> leaveHistoryOpt = leaveHistoryRepository
+                .findTopByEmployeeIdAndLeaveTypeOrderByEndDateDesc(employee.getId(), dto.getLeaveType());
+
+        BigDecimal availableDays;
+
+        if (leaveHistoryOpt.isPresent()) {
+            LeaveHistory existingHistory = leaveHistoryOpt.get();
+            availableDays = existingHistory.getRemainingDays() != null ? existingHistory.getRemainingDays() : BigDecimal.ZERO;
+        } else {
+            availableDays = policy.getTotalDays() != null ? policy.getTotalDays() : BigDecimal.ZERO;
+        }
+
+        if (availableDays.compareTo(requestedDays) < 0) {
+            throw new RuntimeException("Insufficient leave balance. Remaining: " + availableDays + ", Requested: " + requestedDays);
         }
 
         LeaveRequest leaveRequest = new LeaveRequest();
         leaveRequest.setEmployeeId(employee.getId());
-        leaveRequest.setLeaveHistoryId(leaveHistory.getId());
+        leaveRequest.setLeaveHistoryId(null); // Linked only when HR approves the request
+        leaveRequest.setLeaveType(dto.getLeaveType());
         leaveRequest.setStartDate(dto.getStartDate());
         leaveRequest.setEndDate(dto.getEndDate());
         leaveRequest.setReason(dto.getReason());
@@ -103,6 +115,16 @@ public class LeaveService {
         leaveRequest.setDecidedAt(null);
 
         return leaveRequestRepository.save(leaveRequest);
+    }
+
+    public List<LeaveRequest> getEmployeeLeaveRequests() {
+        Employees employee = authenticatedUserService.getAuthenticatedEmployee();
+        return leaveRequestRepository.findByEmployeeId(employee.getId());
+    }
+
+    public List<LeaveHistory> getEmployeeLeaveHistory() {
+        Employees employee = authenticatedUserService.getAuthenticatedEmployee();
+        return leaveHistoryRepository.findByEmployeeId(employee.getId());
     }
 
     public List<LeaveRequest> getEmployeeLeaveRequests(Long employeeId) {
@@ -124,11 +146,35 @@ public class LeaveService {
             throw new RuntimeException("Leave request is not in PENDING status");
         }
 
-        LeaveHistory leaveHistory = leaveHistoryRepository.findById(leaveRequest.getLeaveHistoryId())
-                .orElseThrow(() -> new RuntimeException("Leave history record not found"));
-
         long requestedDaysCount = ChronoUnit.DAYS.between(leaveRequest.getStartDate(), leaveRequest.getEndDate()) + 1;
         BigDecimal requestedDays = BigDecimal.valueOf(requestedDaysCount);
+
+        LeaveHistory leaveHistory = null;
+        if (leaveRequest.getLeaveHistoryId() != null) {
+            leaveHistory = leaveHistoryRepository.findById(leaveRequest.getLeaveHistoryId()).orElse(null);
+        }
+
+        String leaveType = leaveRequest.getLeaveType();
+        if (leaveHistory == null && leaveType != null) {
+            leaveHistory = leaveHistoryRepository
+                    .findTopByEmployeeIdAndLeaveTypeOrderByEndDateDesc(leaveRequest.getEmployeeId(), leaveType)
+                    .orElse(null);
+        }
+
+        if (leaveHistory == null) {
+            if (leaveType == null) {
+                throw new RuntimeException("Cannot identify leave type for request id: " + id);
+            }
+            LeavePolicy policy = leavePolicyRepository.findByLeaveType(leaveType)
+                    .orElseThrow(() -> new RuntimeException("Leave policy not found for type: " + leaveType));
+
+            leaveHistory = new LeaveHistory();
+            leaveHistory.setEmployeeId(leaveRequest.getEmployeeId());
+            leaveHistory.setLeaveType(policy.getLeaveType());
+            leaveHistory.setTotalDays(policy.getTotalDays());
+            leaveHistory.setUsedDays(BigDecimal.ZERO);
+            leaveHistory.setRemainingDays(policy.getTotalDays());
+        }
 
         if (leaveHistory.getRemainingDays() == null || leaveHistory.getRemainingDays().compareTo(requestedDays) < 0) {
             throw new RuntimeException("Insufficient leave balance remaining");
@@ -137,8 +183,11 @@ public class LeaveService {
         BigDecimal currentUsed = leaveHistory.getUsedDays() != null ? leaveHistory.getUsedDays() : BigDecimal.ZERO;
         leaveHistory.setUsedDays(currentUsed.add(requestedDays));
         leaveHistory.setRemainingDays(leaveHistory.getRemainingDays().subtract(requestedDays));
-        leaveHistoryRepository.save(leaveHistory);
+        leaveHistory.setStartDate(leaveRequest.getStartDate());
+        leaveHistory.setEndDate(leaveRequest.getEndDate());
+        LeaveHistory savedHistory = leaveHistoryRepository.save(leaveHistory);
 
+        leaveRequest.setLeaveHistoryId(savedHistory.getId());
         leaveRequest.setStatus("APPROVED");
         if (dto != null && dto.getHrComment() != null) {
             leaveRequest.setHrComment(dto.getHrComment());
@@ -164,7 +213,7 @@ public class LeaveService {
                 "- HR Comment: %s\n\n" +
                 "Best regards,\nHR Department",
                 employee.getFirstName(), employee.getLastName(),
-                leaveHistory.getLeaveType(),
+                savedHistory.getLeaveType(),
                 savedRequest.getStartDate(),
                 savedRequest.getEndDate(),
                 requestedDaysCount,
@@ -195,8 +244,16 @@ public class LeaveService {
         leaveRequest.setDecidedAt(LocalDateTime.now());
         LeaveRequest savedRequest = leaveRequestRepository.save(leaveRequest);
 
-        LeaveHistory leaveHistory = leaveHistoryRepository.findById(leaveRequest.getLeaveHistoryId()).orElse(null);
-        String leaveType = leaveHistory != null ? leaveHistory.getLeaveType() : "N/A";
+        String leaveType = leaveRequest.getLeaveType();
+        if (leaveType == null && leaveRequest.getLeaveHistoryId() != null) {
+            LeaveHistory history = leaveHistoryRepository.findById(leaveRequest.getLeaveHistoryId()).orElse(null);
+            if (history != null) {
+                leaveType = history.getLeaveType();
+            }
+        }
+        if (leaveType == null) {
+            leaveType = "N/A";
+        }
 
         long requestedDaysCount = ChronoUnit.DAYS.between(leaveRequest.getStartDate(), leaveRequest.getEndDate()) + 1;
 

@@ -18,6 +18,7 @@ import com.example.hrmtask.Repository.EmployeesRepository;
 import com.example.hrmtask.Repository.PayrollRepository;
 import com.example.hrmtask.Repository.PayrollScheduleRepository;
 import com.example.hrmtask.Repository.SalaryStructureRepository;
+import com.example.hrmtask.Repository.UsersRepository;
 
 @Service
 public class PayrollService {
@@ -26,21 +27,39 @@ public class PayrollService {
     private final SalaryStructureRepository salaryStructureRepository;
     private final EmployeesRepository employeesRepository;
     private final PayrollScheduleRepository payrollScheduleRepository;
+    private final UsersRepository usersRepository;
     private final PdfService pdfService;
     private final EmailService emailService;
+    private final AuthenticatedUserService authenticatedUserService;
 
     public PayrollService(PayrollRepository payrollRepository,
                           SalaryStructureRepository salaryStructureRepository,
                           EmployeesRepository employeesRepository,
                           PayrollScheduleRepository payrollScheduleRepository,
+                          UsersRepository usersRepository,
                           PdfService pdfService,
-                          EmailService emailService) {
+                          EmailService emailService,
+                          AuthenticatedUserService authenticatedUserService) {
         this.payrollRepository = payrollRepository;
         this.salaryStructureRepository = salaryStructureRepository;
         this.employeesRepository = employeesRepository;
         this.payrollScheduleRepository = payrollScheduleRepository;
+        this.usersRepository = usersRepository;
         this.pdfService = pdfService;
         this.emailService = emailService;
+        this.authenticatedUserService = authenticatedUserService;
+    }
+
+    private String resolveEmployeeEmail(Employees employee) {
+        if (employee.getEmail() != null && !employee.getEmail().isBlank()) {
+            return employee.getEmail().trim();
+        }
+        if (employee.getUserId() != null) {
+            return usersRepository.findById(employee.getUserId())
+                    .map(u -> u.getEmail() != null ? u.getEmail().trim() : null)
+                    .orElse(null);
+        }
+        return null;
     }
 
     public Payroll processEmployeePayroll(Long employeeId, Integer payMonth, Integer payYear) {
@@ -57,7 +76,7 @@ public class PayrollService {
         BigDecimal basicSalary = structure.getBasicSalary() != null ? structure.getBasicSalary() : BigDecimal.ZERO;
         BigDecimal hra = structure.getHra() != null ? structure.getHra() : BigDecimal.ZERO;
         BigDecimal allowance = structure.getAllowance() != null ? structure.getAllowance() : BigDecimal.ZERO;
-        BigDecimal grossSalary = basicSalary.add(hra).add(allowance);
+        BigDecimal grossSalary = structure.getGrossSalary() != null ? structure.getGrossSalary() : basicSalary.add(hra).add(allowance);
 
         BigDecimal pf = structure.getPf() != null ? structure.getPf() : BigDecimal.ZERO;
         BigDecimal otherDeduction = structure.getOtherDeduction() != null ? structure.getOtherDeduction() : BigDecimal.ZERO;
@@ -91,16 +110,24 @@ public class PayrollService {
             System.err.println("Failed to generate PDF payslip for employee " + employeeId + ": " + e.getMessage());
         }
 
-        if (filePath != null && employee.getEmail() != null && !employee.getEmail().isBlank()) {
+        String recipientEmail = resolveEmployeeEmail(employee);
+
+        if (filePath != null && recipientEmail != null && !recipientEmail.isBlank()) {
             String empName = ((employee.getFirstName() != null ? employee.getFirstName() : "") + " " + (employee.getLastName() != null ? employee.getLastName() : "")).trim();
-            boolean success = emailService.sendPayslipWithRetry(employee.getEmail(), filePath, empName, payMonth, payYear, netSalary, 3, 1000);
+            boolean success = emailService.sendPayslipWithRetry(recipientEmail, filePath, empName, payMonth, payYear, netSalary, 3, 1000);
             if (success) {
                 savedPayroll.setEmailStatus("SENT");
             } else {
+                System.err.println("Email delivery failed after retries for employee id " + employeeId + " (" + recipientEmail + ")");
                 savedPayroll.setEmailStatus("FAILED");
             }
             savedPayroll = payrollRepository.save(savedPayroll);
         } else {
+            if (filePath == null) {
+                System.err.println("Payslip email not sent for employee id " + employeeId + ": PDF payslip generation failed.");
+            } else {
+                System.err.println("Payslip email not sent for employee id " + employeeId + ": No valid email address found.");
+            }
             savedPayroll.setEmailStatus("FAILED");
             savedPayroll = payrollRepository.save(savedPayroll);
         }
@@ -134,6 +161,11 @@ public class PayrollService {
         return new BulkPayrollResponseDto(total, successful, failed, alreadyProcessed);
     }
 
+    public List<Payroll> getMyPayrollHistory() {
+        Employees employee = authenticatedUserService.getAuthenticatedEmployee();
+        return payrollRepository.findByEmployeeIdOrderByPayYearDescPayMonthDesc(employee.getId());
+    }
+
     public List<Payroll> getEmployeePayrollHistory(Long employeeId) {
         return payrollRepository.findByEmployeeIdOrderByPayYearDescPayMonthDesc(employeeId);
     }
@@ -154,7 +186,9 @@ public class PayrollService {
         Employees employee = employeesRepository.findById(payroll.getEmployeeId())
                 .orElseThrow(() -> new RuntimeException("Employee not found with id: " + payroll.getEmployeeId()));
 
-        if (employee.getEmail() == null || employee.getEmail().isBlank()) {
+        String recipientEmail = resolveEmployeeEmail(employee);
+        if (recipientEmail == null || recipientEmail.isBlank()) {
+            System.err.println("Retry email failed for payroll id " + payrollId + ": No valid email address found for employee id " + payroll.getEmployeeId());
             payroll.setEmailStatus("FAILED");
             return payrollRepository.save(payroll);
         }
@@ -172,11 +206,12 @@ public class PayrollService {
         }
 
         String empName = ((employee.getFirstName() != null ? employee.getFirstName() : "") + " " + (employee.getLastName() != null ? employee.getLastName() : "")).trim();
-        boolean success = emailService.sendPayslipWithRetry(employee.getEmail(), filePath, empName, payroll.getPayMonth(), payroll.getPayYear(), payroll.getNetSalary(), 3, 1000);
+        boolean success = emailService.sendPayslipWithRetry(recipientEmail, filePath, empName, payroll.getPayMonth(), payroll.getPayYear(), payroll.getNetSalary(), 3, 1000);
 
         if (success) {
             payroll.setEmailStatus("SENT");
         } else {
+            System.err.println("Retry email delivery failed for payroll id " + payrollId + " (" + recipientEmail + ")");
             payroll.setEmailStatus("FAILED");
         }
 

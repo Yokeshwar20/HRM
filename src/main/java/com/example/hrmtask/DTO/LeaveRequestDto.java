@@ -8,7 +8,6 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class LeaveRequestDto {
-    private Long employeeId;
     private String leaveType;
     private LocalDate startDate;
     private LocalDate endDate;

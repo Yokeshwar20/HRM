@@ -1,7 +1,8 @@
 package com.example.hrmtask.Security;
 
 import java.io.IOException;
-import org.jspecify.annotations.NonNull;
+
+import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -33,20 +34,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(@NonNull HttpServletRequest request) throws ServletException {
         String path = request.getServletPath();
         return path.startsWith("/api/auth/") ||
-               path.equals("/login") ||
-               path.equals("/register") ||
-               path.equals("/refresh-token") ||
-               path.startsWith("/swagger-ui") ||
-               path.equals("/swagger-ui.html") ||
-               path.startsWith("/v3/api-docs");
+                path.equals("/login") ||
+                path.equals("/register") ||
+                path.equals("/refresh-token") ||
+                path.startsWith("/swagger-ui") ||
+                path.equals("/swagger-ui.html") ||
+                path.startsWith("/v3/api-docs");
     }
 
     @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
             @NonNull HttpServletResponse response,
-            @NonNull FilterChain filterChain
-    ) throws ServletException, IOException {
+            @NonNull FilterChain filterChain) throws ServletException, IOException {
 
         final String authHeader = request.getHeader("Authorization");
         final String jwt;
@@ -69,19 +69,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
                 UserDetails userDetails = customUserDetailsService.loadUserByUsername(userEmail);
-                if (userDetails != null && userDetails.isEnabled() && jwtService.isTokenValid(jwt, userDetails.getUsername())) {
+                if (userDetails != null && userDetails.isEnabled()
+                        && jwtService.isTokenValid(jwt, userDetails.getUsername())) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,
                             null,
-                            userDetails.getAuthorities()
-                    );
+                            userDetails.getAuthorities());
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             } catch (UsernameNotFoundException ex) {
-                // User no longer exists in DB; do not set authentication into SecurityContextHolder
+                // User no longer exists in DB; do not set authentication into
+                // SecurityContextHolder
             } catch (Exception ex) {
-                // General error loading user or validating token; do not set authentication into SecurityContextHolder
+                // General error loading user or validating token; do not set authentication
+                // into SecurityContextHolder
             }
         }
 

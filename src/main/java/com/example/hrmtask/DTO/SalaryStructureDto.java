@@ -13,6 +13,7 @@ public class SalaryStructureDto {
     private BigDecimal basicSalary;
     private BigDecimal hra;
     private BigDecimal allowance;
+    private BigDecimal grossSalary;
     private BigDecimal pf;
     private BigDecimal otherDeduction;
     private LocalDate effectiveFrom;

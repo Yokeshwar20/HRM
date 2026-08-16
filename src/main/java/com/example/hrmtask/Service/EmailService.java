@@ -20,7 +20,7 @@ public class EmailService {
         MimeMessageHelper helper = new MimeMessageHelper(message, true);
         helper.setTo(email);
         helper.setSubject("Your Payslip");
-        helper.setText("Please find your payslip attached.");
+        helper.setText("Please find your attached payslip.");
         FileSystemResource file = new FileSystemResource(new File(filePath));
         helper.addAttachment(file.getFilename(),file);
         mailSender.send(message);
@@ -41,7 +41,7 @@ public class EmailService {
         helper.setTo(email);
         helper.setSubject("Payslip for " + payMonth + "/" + payYear);
         String body = String.format(
-            "Dear %s,\n\nPlease find attached your payslip for %d/%d.\nNet Salary: %s\n\nBest regards,\nHR Department",
+            "Dear %s,\n\nPlease find your attached payslip for %d/%d.\nNet Salary: %s\n\nBest regards,\nHR Department",
             employeeName, payMonth, payYear, netSalary != null ? netSalary.toString() : "0.00"
         );
         helper.setText(body);

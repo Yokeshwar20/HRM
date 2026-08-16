@@ -1,5 +1,6 @@
 package com.example.hrmtask.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -25,11 +26,18 @@ public class SalaryStructureService {
         employeesRepository.findById(dto.getEmployeeId())
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
 
+        BigDecimal basicSalary = dto.getBasicSalary() != null ? dto.getBasicSalary() : BigDecimal.ZERO;
+        BigDecimal hra = dto.getHra() != null ? dto.getHra() : BigDecimal.ZERO;
+        BigDecimal allowance = dto.getAllowance() != null ? dto.getAllowance() : BigDecimal.ZERO;
+        BigDecimal calculatedGross = basicSalary.add(hra).add(allowance);
+        BigDecimal grossSalary = dto.getGrossSalary() != null ? dto.getGrossSalary() : calculatedGross;
+
         SalaryStructure structure = new SalaryStructure();
         structure.setEmployeeId(dto.getEmployeeId());
-        structure.setBasicSalary(dto.getBasicSalary());
-        structure.setHra(dto.getHra());
-        structure.setAllowance(dto.getAllowance());
+        structure.setBasicSalary(basicSalary);
+        structure.setHra(hra);
+        structure.setAllowance(allowance);
+        structure.setGrossSalary(grossSalary);
         structure.setPf(dto.getPf());
         structure.setOtherDeduction(dto.getOtherDeduction());
         structure.setEffectiveFrom(dto.getEffectiveFrom() != null ? dto.getEffectiveFrom() : LocalDate.now());
@@ -48,13 +56,20 @@ public class SalaryStructureService {
 
         Long empId = dto.getEmployeeId() != null ? dto.getEmployeeId() : existing.getEmployeeId();
 
+        BigDecimal basicSalary = dto.getBasicSalary() != null ? dto.getBasicSalary() : (existing.getBasicSalary() != null ? existing.getBasicSalary() : BigDecimal.ZERO);
+        BigDecimal hra = dto.getHra() != null ? dto.getHra() : (existing.getHra() != null ? existing.getHra() : BigDecimal.ZERO);
+        BigDecimal allowance = dto.getAllowance() != null ? dto.getAllowance() : (existing.getAllowance() != null ? existing.getAllowance() : BigDecimal.ZERO);
+        BigDecimal calculatedGross = basicSalary.add(hra).add(allowance);
+        BigDecimal grossSalary = dto.getGrossSalary() != null ? dto.getGrossSalary() : calculatedGross;
+
         SalaryStructure newStructure = new SalaryStructure();
         newStructure.setEmployeeId(empId);
-        newStructure.setBasicSalary(dto.getBasicSalary());
-        newStructure.setHra(dto.getHra());
-        newStructure.setAllowance(dto.getAllowance());
-        newStructure.setPf(dto.getPf());
-        newStructure.setOtherDeduction(dto.getOtherDeduction());
+        newStructure.setBasicSalary(basicSalary);
+        newStructure.setHra(hra);
+        newStructure.setAllowance(allowance);
+        newStructure.setGrossSalary(grossSalary);
+        newStructure.setPf(dto.getPf() != null ? dto.getPf() : existing.getPf());
+        newStructure.setOtherDeduction(dto.getOtherDeduction() != null ? dto.getOtherDeduction() : existing.getOtherDeduction());
         newStructure.setEffectiveFrom(dto.getEffectiveFrom() != null ? dto.getEffectiveFrom() : LocalDate.now());
 
         return salaryStructureRepository.save(newStructure);

@@ -12,12 +12,13 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class LeaveRequest{
+public class LeaveRequest {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private Long employeeId;
     private Long leaveHistoryId;
+    private String leaveType;
     private LocalDate startDate;
     private LocalDate endDate;
     private String reason;

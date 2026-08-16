@@ -10,6 +10,8 @@ import com.example.hrmtask.Model.Employees;
 
 public interface EmployeesRepository extends JpaRepository<Employees,Long>{
     Optional<Employees> findByEmail(String email);
+
+    Optional<Employees> findByUserId(Long userId);
     
     boolean existsByEmail(String email);
 
