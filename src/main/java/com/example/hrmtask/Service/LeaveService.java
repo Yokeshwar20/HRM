@@ -31,11 +31,11 @@ public class LeaveService {
     private final AuthenticatedUserService authenticatedUserService;
 
     public LeaveService(LeavePolicyRepository leavePolicyRepository,
-                        LeaveHistoryRepository leaveHistoryRepository,
-                        LeaveRequestRepository leaveRequestRepository,
-                        EmployeesRepository employeesRepository,
-                        EmailService emailService,
-                        AuthenticatedUserService authenticatedUserService) {
+            LeaveHistoryRepository leaveHistoryRepository,
+            LeaveRequestRepository leaveRequestRepository,
+            EmployeesRepository employeesRepository,
+            EmailService emailService,
+            AuthenticatedUserService authenticatedUserService) {
         this.leavePolicyRepository = leavePolicyRepository;
         this.leaveHistoryRepository = leaveHistoryRepository;
         this.leaveRequestRepository = leaveRequestRepository;
@@ -43,7 +43,6 @@ public class LeaveService {
         this.emailService = emailService;
         this.authenticatedUserService = authenticatedUserService;
     }
-
 
     public LeavePolicy createPolicy(LeavePolicy policy) {
         if (leavePolicyRepository.findByLeaveType(policy.getLeaveType()).isPresent()) {
@@ -77,7 +76,6 @@ public class LeaveService {
         leavePolicyRepository.delete(policy);
     }
 
-
     public LeaveRequest applyForLeave(LeaveRequestDto dto) {
         Employees employee = authenticatedUserService.getAuthenticatedEmployee();
 
@@ -98,13 +96,15 @@ public class LeaveService {
 
         if (leaveHistoryOpt.isPresent()) {
             LeaveHistory existingHistory = leaveHistoryOpt.get();
-            availableDays = existingHistory.getRemainingDays() != null ? existingHistory.getRemainingDays() : BigDecimal.ZERO;
+            availableDays = existingHistory.getRemainingDays() != null ? existingHistory.getRemainingDays()
+                    : BigDecimal.ZERO;
         } else {
             availableDays = policy.getTotalDays() != null ? policy.getTotalDays() : BigDecimal.ZERO;
         }
 
         if (availableDays.compareTo(requestedDays) < 0) {
-            throw new RuntimeException("Insufficient leave balance. Remaining: " + availableDays + ", Requested: " + requestedDays);
+            throw new RuntimeException(
+                    "Insufficient leave balance. Remaining: " + availableDays + ", Requested: " + requestedDays);
         }
 
         LeaveRequest leaveRequest = new LeaveRequest();
@@ -140,7 +140,6 @@ public class LeaveService {
         return leaveHistoryRepository.findByEmployeeId(employeeId);
     }
 
-
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(LeaveService.class);
 
     @Transactional
@@ -150,7 +149,8 @@ public class LeaveService {
                 .orElseThrow(() -> new RuntimeException("Leave request not found"));
 
         if (!"PENDING".equalsIgnoreCase(leaveRequest.getStatus())) {
-            logger.warn("Leave request ID: {} is not in PENDING status. Current status: {}", id, leaveRequest.getStatus());
+            logger.warn("Leave request ID: {} is not in PENDING status. Current status: {}", id,
+                    leaveRequest.getStatus());
             throw new RuntimeException("Leave request is not in PENDING status");
         }
 
@@ -185,7 +185,8 @@ public class LeaveService {
         }
 
         if (leaveHistory.getRemainingDays() == null || leaveHistory.getRemainingDays().compareTo(requestedDays) < 0) {
-            logger.warn("Insufficient leave balance for request ID: {}. Remaining: {}, Requested: {}", id, leaveHistory.getRemainingDays(), requestedDays);
+            logger.warn("Insufficient leave balance for request ID: {}. Remaining: {}, Requested: {}", id,
+                    leaveHistory.getRemainingDays(), requestedDays);
             throw new RuntimeException("Insufficient leave balance remaining");
         }
 
@@ -195,7 +196,8 @@ public class LeaveService {
         leaveHistory.setStartDate(leaveRequest.getStartDate());
         leaveHistory.setEndDate(leaveRequest.getEndDate());
         LeaveHistory savedHistory = leaveHistoryRepository.save(leaveHistory);
-        logger.info("Updated leave balance for employee ID: {}, remaining days: {}", leaveRequest.getEmployeeId(), savedHistory.getRemainingDays());
+        logger.info("Updated leave balance for employee ID: {}, remaining days: {}", leaveRequest.getEmployeeId(),
+                savedHistory.getRemainingDays());
 
         leaveRequest.setLeaveHistoryId(savedHistory.getId());
         leaveRequest.setStatus("APPROVED");
@@ -213,28 +215,29 @@ public class LeaveService {
             String subject = "Leave Request Approved";
             String hrCommentText = savedRequest.getHrComment() != null ? savedRequest.getHrComment() : "N/A";
             String body = String.format(
-                "Dear %s %s,\n\n" +
-                "Your leave request has been APPROVED.\n\n" +
-                "Details:\n" +
-                "- Leave Type: %s\n" +
-                "- Start Date: %s\n" +
-                "- End Date: %s\n" +
-                "- Number of Days: %d\n" +
-                "- Decision: APPROVED\n" +
-                "- HR Comment: %s\n\n" +
-                "Best regards,\nHR Department",
-                employee.getFirstName(), employee.getLastName(),
-                savedHistory.getLeaveType(),
-                savedRequest.getStartDate(),
-                savedRequest.getEndDate(),
-                requestedDaysCount,
-                hrCommentText
-            );
+                    "Dear %s %s,\n\n" +
+                            "Your leave request has been APPROVED.\n\n" +
+                            "Details:\n" +
+                            "- Leave Type: %s\n" +
+                            "- Start Date: %s\n" +
+                            "- End Date: %s\n" +
+                            "- Number of Days: %d\n" +
+                            "- Decision: APPROVED\n" +
+                            "- HR Comment: %s\n\n" +
+                            "Best regards,\nHR Department",
+                    employee.getFirstName(), employee.getLastName(),
+                    savedHistory.getLeaveType(),
+                    savedRequest.getStartDate(),
+                    savedRequest.getEndDate(),
+                    requestedDaysCount,
+                    hrCommentText);
 
             emailService.sendLeaveNotification(employee.getEmail(), subject, body);
-            logger.info("Successfully sent approval email notification to employee ID: {} (email: {})", employee.getId(), employee.getEmail());
+            logger.info("Successfully sent approval email notification to employee ID: {} (email: {})",
+                    employee.getId(), employee.getEmail());
         } catch (Exception e) {
-            logger.error("Failed to send leave approval email to employee ID: {} (email: {}). Error: {}", employee.getId(), employee.getEmail(), e.getMessage(), e);
+            logger.error("Failed to send leave approval email to employee ID: {} (email: {}). Error: {}",
+                    employee.getId(), employee.getEmail(), e.getMessage(), e);
             throw new RuntimeException("Failed to send email notification: " + e.getMessage(), e);
         }
 
@@ -248,7 +251,8 @@ public class LeaveService {
                 .orElseThrow(() -> new RuntimeException("Leave request not found"));
 
         if (!"PENDING".equalsIgnoreCase(leaveRequest.getStatus())) {
-            logger.warn("Leave request ID: {} is not in PENDING status. Current status: {}", id, leaveRequest.getStatus());
+            logger.warn("Leave request ID: {} is not in PENDING status. Current status: {}", id,
+                    leaveRequest.getStatus());
             throw new RuntimeException("Leave request is not in PENDING status");
         }
 
@@ -280,28 +284,29 @@ public class LeaveService {
             String subject = "Leave Request Rejected";
             String hrCommentText = savedRequest.getHrComment() != null ? savedRequest.getHrComment() : "N/A";
             String body = String.format(
-                "Dear %s %s,\n\n" +
-                "Your leave request has been REJECTED.\n\n" +
-                "Details:\n" +
-                "- Leave Type: %s\n" +
-                "- Start Date: %s\n" +
-                "- End Date: %s\n" +
-                "- Number of Days: %d\n" +
-                "- Decision: REJECTED\n" +
-                "- HR Comment / Reason: %s\n\n" +
-                "Best regards,\nHR Department",
-                employee.getFirstName(), employee.getLastName(),
-                leaveType,
-                savedRequest.getStartDate(),
-                savedRequest.getEndDate(),
-                requestedDaysCount,
-                hrCommentText
-            );
+                    "Dear %s %s,\n\n" +
+                            "Your leave request has been REJECTED.\n\n" +
+                            "Details:\n" +
+                            "- Leave Type: %s\n" +
+                            "- Start Date: %s\n" +
+                            "- End Date: %s\n" +
+                            "- Number of Days: %d\n" +
+                            "- Decision: REJECTED\n" +
+                            "- HR Comment / Reason: %s\n\n" +
+                            "Best regards,\nHR Department",
+                    employee.getFirstName(), employee.getLastName(),
+                    leaveType,
+                    savedRequest.getStartDate(),
+                    savedRequest.getEndDate(),
+                    requestedDaysCount,
+                    hrCommentText);
 
             emailService.sendLeaveNotification(employee.getEmail(), subject, body);
-            logger.info("Successfully sent rejection email notification to employee ID: {} (email: {})", employee.getId(), employee.getEmail());
+            logger.info("Successfully sent rejection email notification to employee ID: {} (email: {})",
+                    employee.getId(), employee.getEmail());
         } catch (Exception e) {
-            logger.error("Failed to send leave rejection email to employee ID: {} (email: {}). Error: {}", employee.getId(), employee.getEmail(), e.getMessage(), e);
+            logger.error("Failed to send leave rejection email to employee ID: {} (email: {}). Error: {}",
+                    employee.getId(), employee.getEmail(), e.getMessage(), e);
             throw new RuntimeException("Failed to send email notification: " + e.getMessage(), e);
         }
 
@@ -326,7 +331,7 @@ public class LeaveService {
             employeesRepository.findById(request.getEmployeeId()).ifPresent(emp -> {
                 dto.setEmployeeCode(emp.getEmployeeCode());
                 String fullName = ((emp.getFirstName() != null ? emp.getFirstName() : "") + " " +
-                                  (emp.getLastName() != null ? emp.getLastName() : "")).trim();
+                        (emp.getLastName() != null ? emp.getLastName() : "")).trim();
                 dto.setEmployeeName(fullName);
             });
         }
@@ -365,7 +370,8 @@ public class LeaveService {
         return leaveRequestRepository.findByEmployeeId(employee.getId());
     }
 
-    public List<com.example.hrmtask.DTO.LeaveRequestResponseDto> getEmployeeLeaveRequestsForHRByCode(String employeeCode) {
+    public List<com.example.hrmtask.DTO.LeaveRequestResponseDto> getEmployeeLeaveRequestsForHRByCode(
+            String employeeCode) {
         Employees employee = employeesRepository.findByEmployeeCode(employeeCode)
                 .orElseThrow(() -> new RuntimeException("Employee not found with code: " + employeeCode));
         return leaveRequestRepository.findByEmployeeId(employee.getId()).stream()
