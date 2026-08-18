@@ -25,7 +25,7 @@ public class EmailService {
     private static final Logger logger = LoggerFactory.getLogger(EmailService.class);
 
     private final HttpClient httpClient;
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private final String apiKey;
     private final String fromEmail;
     private final String fromName;
@@ -33,12 +33,10 @@ public class EmailService {
     public EmailService(
             @Value("${brevo.api.key:}") String apiKey,
             @Value("${brevo.from.email:forbotlogin3@gmail.com}") String fromEmail,
-            @Value("${brevo.from.name:HR Management System}") String fromName,
-            ObjectMapper objectMapper) {
+            @Value("${brevo.from.name:HR Management System}") String fromName) {
         this.apiKey = apiKey;
         this.fromEmail = fromEmail;
         this.fromName = fromName;
-        this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
