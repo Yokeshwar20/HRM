@@ -44,8 +44,8 @@ public class PayrollController {
     }
 
     @PostMapping("/process/employee")
-    public ResponseEntity<Payroll> processEmployeePayroll(@RequestBody PayrollRequestDto dto) {
-        Payroll payroll = payrollService.processEmployeePayrollByCode(dto.getEmployeeCode(), dto.getPayMonth(), dto.getPayYear());
+    public ResponseEntity<PayrollResponseDto> processEmployeePayroll(@RequestBody PayrollRequestDto dto) {
+        PayrollResponseDto payroll = payrollService.processEmployeePayrollByCodeDto(dto.getEmployeeCode(), dto.getPayMonth(), dto.getPayYear());
         return ResponseEntity.ok(payroll);
     }
 

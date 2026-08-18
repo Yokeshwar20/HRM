@@ -162,6 +162,11 @@ public class PayrollService {
         return new BulkPayrollResponseDto(total, successful, failed, alreadyProcessed);
     }
 
+    public PayrollResponseDto processEmployeePayrollByCodeDto(String employeeCode, Integer payMonth, Integer payYear) {
+        Payroll p = processEmployeePayrollByCode(employeeCode, payMonth, payYear);
+        return mapToPayrollResponseDto(p);
+    }
+
     public Payroll processEmployeePayrollByCode(String employeeCode, Integer payMonth, Integer payYear) {
         Employees employee = employeesRepository.findByEmployeeCode(employeeCode)
                 .orElseThrow(() -> new RuntimeException("Employee not found with code: " + employeeCode));
