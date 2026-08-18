@@ -9,6 +9,7 @@ public class WakeupController {
 
     @GetMapping("/api/wakeup")
     public ResponseEntity<String> wakeup() {
+        System.out.println(" live ");
         return ResponseEntity.ok("OK");
     }
 }

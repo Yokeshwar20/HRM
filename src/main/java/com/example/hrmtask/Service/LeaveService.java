@@ -141,12 +141,16 @@ public class LeaveService {
     }
 
 
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(LeaveService.class);
+
     @Transactional
     public LeaveRequest approveLeaveRequest(Long id, LeaveDecisionDto dto) {
+        logger.info("Processing leave approval for request ID: {}", id);
         LeaveRequest leaveRequest = leaveRequestRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Leave request not found"));
 
         if (!"PENDING".equalsIgnoreCase(leaveRequest.getStatus())) {
+            logger.warn("Leave request ID: {} is not in PENDING status. Current status: {}", id, leaveRequest.getStatus());
             throw new RuntimeException("Leave request is not in PENDING status");
         }
 
@@ -181,6 +185,7 @@ public class LeaveService {
         }
 
         if (leaveHistory.getRemainingDays() == null || leaveHistory.getRemainingDays().compareTo(requestedDays) < 0) {
+            logger.warn("Insufficient leave balance for request ID: {}. Remaining: {}, Requested: {}", id, leaveHistory.getRemainingDays(), requestedDays);
             throw new RuntimeException("Insufficient leave balance remaining");
         }
 
@@ -190,6 +195,7 @@ public class LeaveService {
         leaveHistory.setStartDate(leaveRequest.getStartDate());
         leaveHistory.setEndDate(leaveRequest.getEndDate());
         LeaveHistory savedHistory = leaveHistoryRepository.save(leaveHistory);
+        logger.info("Updated leave balance for employee ID: {}, remaining days: {}", leaveRequest.getEmployeeId(), savedHistory.getRemainingDays());
 
         leaveRequest.setLeaveHistoryId(savedHistory.getId());
         leaveRequest.setStatus("APPROVED");
@@ -198,6 +204,7 @@ public class LeaveService {
         }
         leaveRequest.setDecidedAt(LocalDateTime.now());
         LeaveRequest savedRequest = leaveRequestRepository.save(leaveRequest);
+        logger.info("Leave request ID: {} status updated to APPROVED", id);
 
         Employees employee = employeesRepository.findById(leaveRequest.getEmployeeId())
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
@@ -225,7 +232,9 @@ public class LeaveService {
             );
 
             emailService.sendLeaveNotification(employee.getEmail(), subject, body);
+            logger.info("Successfully sent approval email notification to employee ID: {} (email: {})", employee.getId(), employee.getEmail());
         } catch (Exception e) {
+            logger.error("Failed to send leave approval email to employee ID: {} (email: {}). Error: {}", employee.getId(), employee.getEmail(), e.getMessage(), e);
             throw new RuntimeException("Failed to send email notification: " + e.getMessage(), e);
         }
 
@@ -234,10 +243,12 @@ public class LeaveService {
 
     @Transactional
     public LeaveRequest rejectLeaveRequest(Long id, LeaveDecisionDto dto) {
+        logger.info("Processing leave rejection for request ID: {}", id);
         LeaveRequest leaveRequest = leaveRequestRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Leave request not found"));
 
         if (!"PENDING".equalsIgnoreCase(leaveRequest.getStatus())) {
+            logger.warn("Leave request ID: {} is not in PENDING status. Current status: {}", id, leaveRequest.getStatus());
             throw new RuntimeException("Leave request is not in PENDING status");
         }
 
@@ -247,6 +258,7 @@ public class LeaveService {
         }
         leaveRequest.setDecidedAt(LocalDateTime.now());
         LeaveRequest savedRequest = leaveRequestRepository.save(leaveRequest);
+        logger.info("Leave request ID: {} status updated to REJECTED", id);
 
         String leaveType = leaveRequest.getLeaveType();
         if (leaveType == null && leaveRequest.getLeaveHistoryId() != null) {
@@ -287,7 +299,9 @@ public class LeaveService {
             );
 
             emailService.sendLeaveNotification(employee.getEmail(), subject, body);
+            logger.info("Successfully sent rejection email notification to employee ID: {} (email: {})", employee.getId(), employee.getEmail());
         } catch (Exception e) {
+            logger.error("Failed to send leave rejection email to employee ID: {} (email: {}). Error: {}", employee.getId(), employee.getEmail(), e.getMessage(), e);
             throw new RuntimeException("Failed to send email notification: " + e.getMessage(), e);
         }
 
