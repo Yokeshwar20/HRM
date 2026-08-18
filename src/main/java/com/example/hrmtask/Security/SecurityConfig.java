@@ -43,6 +43,7 @@ public class SecurityConfig {
                     "/login",
                     "/register",
                     "/refresh-token",
+                    "/api/wakeup",
                     "/swagger-ui/**",
                     "/swagger-ui.html",
                     "/v3/api-docs/**"
