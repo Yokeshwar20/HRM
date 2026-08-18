@@ -232,13 +232,16 @@ public class LeaveService {
                     requestedDaysCount,
                     hrCommentText);
 
-            emailService.sendLeaveNotification(employee.getEmail(), subject, body);
-            logger.info("Successfully sent approval email notification to employee ID: {} (email: {})",
-                    employee.getId(), employee.getEmail());
+            emailService.sendLeaveNotification(employee.getEmail(), subject, body)
+                .whenComplete((res, err) -> {
+                    if (err != null) {
+                        logger.error("Failed to send leave approval email to employee ID: {} (email: {}). Error: {}", employee.getId(), employee.getEmail(), err.getMessage());
+                    } else {
+                        logger.info("Successfully sent approval email notification to employee ID: {} (email: {})", employee.getId(), employee.getEmail());
+                    }
+                });
         } catch (Exception e) {
-            logger.error("Failed to send leave approval email to employee ID: {} (email: {}). Error: {}",
-                    employee.getId(), employee.getEmail(), e.getMessage(), e);
-            throw new RuntimeException("Failed to send email notification: " + e.getMessage(), e);
+            logger.error("Failed to initiate leave approval email to employee ID: {} (email: {}). Error: {}", employee.getId(), employee.getEmail(), e.getMessage(), e);
         }
 
         return savedRequest;
@@ -301,13 +304,16 @@ public class LeaveService {
                     requestedDaysCount,
                     hrCommentText);
 
-            emailService.sendLeaveNotification(employee.getEmail(), subject, body);
-            logger.info("Successfully sent rejection email notification to employee ID: {} (email: {})",
-                    employee.getId(), employee.getEmail());
+            emailService.sendLeaveNotification(employee.getEmail(), subject, body)
+                .whenComplete((res, err) -> {
+                    if (err != null) {
+                        logger.error("Failed to send leave rejection email to employee ID: {} (email: {}). Error: {}", employee.getId(), employee.getEmail(), err.getMessage());
+                    } else {
+                        logger.info("Successfully sent rejection email notification to employee ID: {} (email: {})", employee.getId(), employee.getEmail());
+                    }
+                });
         } catch (Exception e) {
-            logger.error("Failed to send leave rejection email to employee ID: {} (email: {}). Error: {}",
-                    employee.getId(), employee.getEmail(), e.getMessage(), e);
-            throw new RuntimeException("Failed to send email notification: " + e.getMessage(), e);
+            logger.error("Failed to initiate leave rejection email to employee ID: {} (email: {}). Error: {}", employee.getId(), employee.getEmail(), e.getMessage(), e);
         }
 
         return savedRequest;
