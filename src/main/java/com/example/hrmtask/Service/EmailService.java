@@ -31,10 +31,10 @@ public class EmailService {
     private final String fromName;
 
     public EmailService(
-            @Value("${brevo.api.key:}") String apiKey,
+            @Value("${brevo.api.key}") String apiKey,
             @Value("${brevo.from.email:forbotlogin3@gmail.com}") String fromEmail,
             @Value("${brevo.from.name:HR Management System}") String fromName) {
-        this.apiKey = apiKey;
+        this.apiKey=apiKey;
         this.fromEmail = fromEmail;
         this.fromName = fromName;
         this.httpClient = HttpClient.newBuilder()
@@ -57,14 +57,15 @@ public class EmailService {
         return sendPayslipWithDetails(recipientEmail, filePath, "Employee", null, null, null);
     }
 
-    public CompletableFuture<String> sendPayslipWithDetails(String recipientEmail, String filePath, String employeeName, Integer payMonth, Integer payYear, java.math.BigDecimal netSalary) {
-        String subject = (payMonth != null && payYear != null) ? "Payslip for " + payMonth + "/" + payYear : "Your Payslip";
+    public CompletableFuture<String> sendPayslipWithDetails(String recipientEmail, String filePath, String employeeName,
+            Integer payMonth, Integer payYear, java.math.BigDecimal netSalary) {
+        String subject = (payMonth != null && payYear != null) ? "Payslip for " + payMonth + "/" + payYear
+                : "Your Payslip";
         String body = String.format(
-            "Dear %s,\n\nPlease find your attached payslip for %s.\nNet Salary: %s\n\nBest regards,\nHR Department",
-            employeeName != null ? employeeName : "Employee",
-            (payMonth != null && payYear != null) ? payMonth + "/" + payYear : "the period",
-            netSalary != null ? netSalary.toString() : "0.00"
-        );
+                "Dear %s,\n\nPlease find your attached payslip for %s.\nNet Salary: %s\n\nBest regards,\nHR Department",
+                employeeName != null ? employeeName : "Employee",
+                (payMonth != null && payYear != null) ? payMonth + "/" + payYear : "the period",
+                netSalary != null ? netSalary.toString() : "0.00");
 
         List<BrevoEmailRequestDto.Attachment> attachments = null;
         if (filePath != null) {
@@ -93,16 +94,17 @@ public class EmailService {
         return sendBrevoEmailAsync(request, recipientEmail);
     }
 
-    public boolean sendPayslipWithRetry(String email, String filePath, String employeeName, Integer payMonth, Integer payYear, java.math.BigDecimal netSalary, int maxRetries, long delayMillis) {
+    public boolean sendPayslipWithRetry(String email, String filePath, String employeeName, Integer payMonth,
+            Integer payYear, java.math.BigDecimal netSalary, int maxRetries, long delayMillis) {
         try {
             sendPayslipWithDetails(email, filePath, employeeName, payMonth, payYear, netSalary)
-                .whenComplete((response, error) -> {
-                    if (error != null) {
-                        logger.error("Failed to send payslip email to {}: {}", email, error.getMessage());
-                    } else {
-                        logger.info("Successfully sent payslip email to {}", email);
-                    }
-                });
+                    .whenComplete((response, error) -> {
+                        if (error != null) {
+                            logger.error("Failed to send payslip email to {}: {}", email, error.getMessage());
+                        } else {
+                            logger.info("Successfully sent payslip email to {}", email);
+                        }
+                    });
             return true;
         } catch (Exception e) {
             logger.error("Error initiating payslip email to {}: {}", email, e.getMessage());
@@ -113,7 +115,8 @@ public class EmailService {
     private CompletableFuture<String> sendBrevoEmailAsync(BrevoEmailRequestDto requestDto, String recipientEmail) {
         if (apiKey == null || apiKey.isBlank()) {
             logger.warn("Brevo API key is not configured. Skipping email to {}", recipientEmail);
-            return CompletableFuture.completedFuture("Brevo API key missing");
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("Brevo API key is missing or blank in environment variables"));
         }
 
         try {
@@ -127,19 +130,16 @@ public class EmailService {
                     .build();
 
             return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                    .thenApply(response -> {
+                    .thenCompose(response -> {
                         if (response.statusCode() >= 200 && response.statusCode() < 300) {
                             logger.info("Successfully sent email via Brevo HTTP API to {}", recipientEmail);
-                            return response.body();
+                            return CompletableFuture.completedFuture(response.body());
                         } else {
                             logger.error("Failed to send email via Brevo HTTP API to {}. HTTP Status: {}, Body: {}",
                                     recipientEmail, response.statusCode(), response.body());
-                            throw new RuntimeException("Brevo API returned HTTP status: " + response.statusCode());
+                            return CompletableFuture.failedFuture(
+                                    new RuntimeException("Brevo API returned HTTP status: " + response.statusCode()));
                         }
-                    })
-                    .exceptionally(ex -> {
-                        logger.error("Failed to send email via Brevo HTTP API to {}: {}", recipientEmail, ex.getMessage());
-                        return "Failed to send email";
                     });
         } catch (Exception e) {
             logger.error("Failed to serialize Brevo email payload for {}: {}", recipientEmail, e.getMessage());

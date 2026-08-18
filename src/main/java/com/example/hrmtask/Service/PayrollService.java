@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.hrmtask.DTO.BulkPayrollResponseDto;
+import com.example.hrmtask.DTO.PayrollResponseDto;
 import com.example.hrmtask.DTO.PayrollScheduleDto;
 import com.example.hrmtask.Model.Employees;
 import com.example.hrmtask.Model.Payroll;
@@ -167,24 +168,64 @@ public class PayrollService {
         return processEmployeePayroll(employee.getId(), payMonth, payYear);
     }
 
-    public List<Payroll> getMyPayrollHistory() {
+    public PayrollResponseDto mapToPayrollResponseDto(Payroll p) {
+        Employees emp = employeesRepository.findById(p.getEmployeeId()).orElse(null);
+        String code = emp != null ? emp.getEmployeeCode() : "N/A";
+        String name = emp != null ? ((emp.getFirstName() != null ? emp.getFirstName() : "") + " " + (emp.getLastName() != null ? emp.getLastName() : "")).trim() : "N/A";
+
+        return PayrollResponseDto.builder()
+                .id(p.getId())
+                .employeeId(p.getEmployeeId())
+                .employeeCode(code)
+                .employeeName(name)
+                .payMonth(p.getPayMonth())
+                .payYear(p.getPayYear())
+                .basicSalary(p.getBasicSalary())
+                .hra(p.getHra())
+                .allowance(p.getAllowance())
+                .grossSalary(p.getGrossSalary())
+                .pf(p.getPf())
+                .otherDeduction(p.getOtherDeduction())
+                .totalDeduction(p.getTotalDeduction())
+                .netSalary(p.getNetSalary())
+                .payslipPath(p.getPayslipPath())
+                .emailStatus(p.getEmailStatus())
+                .processedAt(p.getProcessedAt())
+                .build();
+    }
+
+    public List<PayrollResponseDto> getMyPayrollHistory() {
         Employees employee = authenticatedUserService.getAuthenticatedEmployee();
-        return payrollRepository.findByEmployeeIdOrderByPayYearDescPayMonthDesc(employee.getId());
+        List<Payroll> list = payrollRepository.findByEmployeeIdOrderByPayYearDescPayMonthDesc(employee.getId());
+        return list.stream().map(this::mapToPayrollResponseDto).toList();
     }
 
-    public List<Payroll> getEmployeePayrollHistory(Long employeeId) {
-        return payrollRepository.findByEmployeeIdOrderByPayYearDescPayMonthDesc(employeeId);
+    public List<PayrollResponseDto> getEmployeePayrollHistory(Long employeeId) {
+        List<Payroll> list = payrollRepository.findByEmployeeIdOrderByPayYearDescPayMonthDesc(employeeId);
+        return list.stream().map(this::mapToPayrollResponseDto).toList();
     }
 
-    public List<Payroll> getEmployeePayrollHistoryByCode(String employeeCode) {
+    public List<PayrollResponseDto> getEmployeePayrollHistoryByCode(String employeeCode) {
         Employees employee = employeesRepository.findByEmployeeCode(employeeCode)
                 .orElseThrow(() -> new RuntimeException("Employee not found with code: " + employeeCode));
-        return payrollRepository.findByEmployeeIdOrderByPayYearDescPayMonthDesc(employee.getId());
+        List<Payroll> list = payrollRepository.findByEmployeeIdOrderByPayYearDescPayMonthDesc(employee.getId());
+        return list.stream().map(this::mapToPayrollResponseDto).toList();
+    }
+
+    public PayrollResponseDto getPayrollByIdDto(Long id) {
+        Payroll payroll = payrollRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Payroll record not found with id: " + id));
+        return mapToPayrollResponseDto(payroll);
     }
 
     public Payroll getPayrollById(Long id) {
         return payrollRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Payroll record not found with id: " + id));
+    }
+
+    public List<PayrollResponseDto> getAllPayrollsDto() {
+        List<Payroll> list = payrollRepository.findAll();
+        return list.stream().map(this::mapToPayrollResponseDto).toList();
     }
 
     public List<Payroll> getAllPayrolls() {

@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.hrmtask.DTO.PayrollResponseDto;
 import com.example.hrmtask.Model.Employees;
 import com.example.hrmtask.Model.Payroll;
 import com.example.hrmtask.Service.AuthenticatedUserService;
@@ -31,8 +32,8 @@ public class EmployeePayrollController {
     }
 
     @GetMapping("/history")
-    public ResponseEntity<List<Payroll>> getEmployeePayrollHistory() {
-        List<Payroll> history = payrollService.getMyPayrollHistory();
+    public ResponseEntity<List<PayrollResponseDto>> getEmployeePayrollHistory() {
+        List<PayrollResponseDto> history = payrollService.getMyPayrollHistory();
         return ResponseEntity.ok(history);
     }
 

@@ -18,6 +18,7 @@ import com.example.hrmtask.DTO.BulkPayrollRequestDto;
 import com.example.hrmtask.DTO.BulkPayrollResponseDto;
 import com.example.hrmtask.DTO.PayrollExportRequest;
 import com.example.hrmtask.DTO.PayrollRequestDto;
+import com.example.hrmtask.DTO.PayrollResponseDto;
 import com.example.hrmtask.DTO.PayrollScheduleDto;
 import com.example.hrmtask.Model.Payroll;
 import com.example.hrmtask.Model.PayrollSchedule;
@@ -49,20 +50,20 @@ public class PayrollController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Payroll>> getAllPayrolls() {
-        List<Payroll> payrolls = payrollService.getAllPayrolls();
+    public ResponseEntity<List<PayrollResponseDto>> getAllPayrolls() {
+        List<PayrollResponseDto> payrolls = payrollService.getAllPayrollsDto();
         return ResponseEntity.ok(payrolls);
     }
 
     @GetMapping("/employee/{employeeCode}/history")
-    public ResponseEntity<List<Payroll>> getEmployeePayrollHistory(@PathVariable String employeeCode) {
-        List<Payroll> payrolls = payrollService.getEmployeePayrollHistoryByCode(employeeCode);
+    public ResponseEntity<List<PayrollResponseDto>> getEmployeePayrollHistory(@PathVariable String employeeCode) {
+        List<PayrollResponseDto> payrolls = payrollService.getEmployeePayrollHistoryByCode(employeeCode);
         return ResponseEntity.ok(payrolls);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Payroll> getPayrollById(@PathVariable Long id) {
-        Payroll payroll = payrollService.getPayrollById(id);
+    public ResponseEntity<PayrollResponseDto> getPayrollById(@PathVariable Long id) {
+        PayrollResponseDto payroll = payrollService.getPayrollByIdDto(id);
         return ResponseEntity.ok(payroll);
     }
 
